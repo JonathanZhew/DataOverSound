@@ -62,7 +62,7 @@ plt.show()
 """
 demapping_table = {v : k for k, v in mapping_table.items()}
 
-channelResponse = np.array([1, 0, 0.3+0.3j])  # the impulse response of the wireless channel
+channelResponse = np.array([1, 0, 0.3+0.3])  # the impulse response of the wireless channel
 H_exact = np.fft.fft(channelResponse, K)
 plt.plot(allCarriers, abs(H_exact))
 
@@ -121,7 +121,8 @@ def channel(signal):
     
     # Generate complex noise with given variance
     noise = np.sqrt(sigma2/2) * (np.random.randn(*convolved.shape)+1j*np.random.randn(*convolved.shape))
-    return convolved + noise
+    #return convolved + noise
+    return signal + noise[:-2]
 OFDM_TX = OFDM_withCP
 OFDM_RX = channel(OFDM_TX)
 
@@ -134,12 +135,12 @@ plt.grid(True);
 #plt.show()scipy
 
 def removeCP(signal):
-    return signal[CP:(CP+K)]
+    return signal[CP:]
 OFDM_RX_noCP = removeCP(OFDM_RX)
 
 def DFT(OFDM_RX):
     fft_data = np.fft.fft(OFDM_RX)
-    app_data = fft_data[payloadBits_per_OFDM+1:]
+    app_data = fft_data[K+1:2*K+1]
     return app_data
     #return np.fft.fft(OFDM_RX)
 OFDM_demod = DFT(OFDM_RX_noCP)
