@@ -1,8 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy
-from scipy import interpolate
+import scipy.interpolate
 
 
 K = 64 # number of OFDM subcarriers
@@ -21,12 +20,15 @@ P = P+1
 # data carriers are all remaining carriers
 dataCarriers = np.delete(allCarriers, pilotCarriers)
 
-print ("allCarriers:   %s" % allCarriers)
-print ("pilotCarriers: %s" % pilotCarriers)
-print ("dataCarriers:  %s" % dataCarriers)
-#plt.plot(pilotCarriers, np.zeros_like(pilotCarriers), 'bo', label='pilot')
-#plt.plot(dataCarriers, np.zeros_like(dataCarriers), 'ro', label='data')
-#plt.show()
+plt.figure(figsize=(8,0.8))
+plt.plot(pilotCarriers, np.zeros_like(pilotCarriers), 'bo', label='pilot')
+plt.plot(dataCarriers, np.zeros_like(dataCarriers), 'ro', label='data')
+plt.legend(fontsize=10, ncol=2)
+plt.xlim((-1,K)); plt.ylim((-0.1, 0.3))
+plt.xlabel('Carrier index')
+plt.yticks([])
+plt.grid(True)
+plt.savefig("pilots.png")
 
 mu = 4 # bits per symbol (i.e. 16QAM)
 payloadBits_per_OFDM = len(dataCarriers)*mu  # number of payload bits per OFDM symbol
@@ -49,51 +51,30 @@ mapping_table = {
     (1,1,1,0) :  1+3j,
     (1,1,1,1) :  1+1j
 }
-"""
-for b3 in [0, 1]:
-    for b2 in [0, 1]:
-        for b1 in [0, 1]:
-            for b0 in [0, 1]:
-                B = (b3, b2, b1, b0)
-                Q = mapping_table[B]
-                plt.plot(Q.real, Q.imag, 'bo')
-                plt.text(Q.real, Q.imag+0.2, "".join(str(x) for x in B), ha='center')
-plt.show()
-"""
 demapping_table = {v : k for k, v in mapping_table.items()}
 
-channelResponse = np.array([1, 0, 0.3+0.3])  # the impulse response of the wireless channel
-H_exact = np.fft.fft(channelResponse, K)
-plt.plot(allCarriers, abs(H_exact))
+channelResponse = np.array([1, 0, 0.3+0.3j])  # the impulse response of the wireless channel
+H_exact = np.fft.fft(channelResponse, 2*K)[:K]
 
 
 SNRdb = 25  # signal to noise-ratio in dB at the receiver 
 
-bits = np.random.binomial(n=1, p=0.5, size=(payloadBits_per_OFDM, ))
-print ("Bits count: ", len(bits))
-print ("First 20 bits: ", bits[:20])
-print ("Mean of bits (should be around 0.5): ", np.mean(bits))
+
 
 def SP(bits):
     return bits.reshape((len(dataCarriers), mu))
-bits_SP = SP(bits)
-print ("First 5 bit groups")
-print (bits_SP[:5,:])
+
 
 def Mapping(bits):
     return np.array([mapping_table[tuple(b)] for b in bits])
-QAM = Mapping(bits_SP)
-print ("First 5 QAM symbols and bits:")
-#print (bits_SP[:5,:])
-print (QAM[:5])
+
 
 def OFDM_symbol(QAM_payload):
     symbol = np.zeros(K, dtype=complex) # the overall K subcarriers
     symbol[pilotCarriers] = pilotValue  # allocate the pilot subcarriers 
     symbol[dataCarriers] = QAM_payload  # allocate the pilot subcarriers
     return symbol
-OFDM_data = OFDM_symbol(QAM)
-print ("Number of OFDM carriers in frequency domain: ", len(OFDM_data))
+
 
 def IDFT(OFDM_data):
     conj_data = np.conjugate(OFDM_data)
@@ -103,14 +84,11 @@ def IDFT(OFDM_data):
     ifft_data = np.fft.ifft(app_data)
     return ifft_data.real
     #return np.fft.ifft(OFDM_data)
-OFDM_time = IDFT(OFDM_data)
-print ("Number of OFDM samples in time-domain before CP: ", len(OFDM_time))
+
 
 def addCP(OFDM_time):
     cp = OFDM_time[-CP:]               # take the last CP samples ...
     return np.hstack([cp, OFDM_time])  # ... and add them to the beginning
-OFDM_withCP = addCP(OFDM_time)
-print ("Number of OFDM samples in time domain with CP: ", len(OFDM_withCP))
 
 def channel(signal):
     convolved = np.convolve(signal, channelResponse)
@@ -121,29 +99,20 @@ def channel(signal):
     
     # Generate complex noise with given variance
     noise = np.sqrt(sigma2/2) * (np.random.randn(*convolved.shape)+1j*np.random.randn(*convolved.shape))
-    #return convolved + noise
-    return signal + noise[:-2]
-OFDM_TX = OFDM_withCP
-OFDM_RX = channel(OFDM_TX)
+    return convolved #+ noise
+    #return signal# + noise[:-2]
 
-plt.figure()
-plt.plot(abs(OFDM_TX), label='TX signal')
-plt.plot(abs(OFDM_RX), label='RX signal')
-plt.legend(fontsize=10)
-plt.xlabel('Time'); plt.ylabel('$|x(t)|$');
-plt.grid(True);
-#plt.show()scipy
 
 def removeCP(signal):
-    return signal[CP:]
-OFDM_RX_noCP = removeCP(OFDM_RX)
+    return signal[CP:(CP+2*K+1)]
+
 
 def DFT(OFDM_RX):
     fft_data = np.fft.fft(OFDM_RX)
     app_data = fft_data[K+1:2*K+1]
     return app_data
     #return np.fft.fft(OFDM_RX)
-OFDM_demod = DFT(OFDM_RX_noCP)
+
 
 def channelEstimate(OFDM_demod):
     pilots = OFDM_demod[pilotCarriers]  # extract the pilot values from the RX signal
@@ -164,18 +133,15 @@ def channelEstimate(OFDM_demod):
     plt.ylim(0,2)
     
     return Hest
-Hest = channelEstimate(OFDM_demod)
 
-
+    
 def equalize(OFDM_demod, Hest):
-    return OFDM_demod / Hest
-equalized_Hest = equalize(OFDM_demod, Hest)
+    return OFDM_demod/ Hest
+
 
 def get_payload(equalized):
     return equalized[dataCarriers]
-QAM_est = get_payload(equalized_Hest)
-plt.figure()
-plt.plot(QAM_est.real, QAM_est.imag, 'bo');
+
 
 
 def Demapping(QAM):
@@ -195,15 +161,65 @@ def Demapping(QAM):
     # transform the constellation point into the bit groups
     return np.vstack([demapping_table[C] for C in hardDecision]), hardDecision
 
+def PS(bits):
+    return bits.reshape((-1,))
+bits = np.random.binomial(n=1, p=0.5, size=(payloadBits_per_OFDM, ))
+print ("Bits count: ", len(bits))
+print ("First 20 bits: ", bits[:20])
+print ("Mean of bits (should be around 0.5): ", np.mean(bits))
+
+bits_SP = SP(bits)
+print ("First 5 bit groups")
+print (bits_SP[:5,:])
+
+QAM = Mapping(bits_SP)
+print ("First 5 QAM symbols and bits:")
+#print (bits_SP[:5,:])
+print (QAM[:5])
+
+OFDM_data = OFDM_symbol(QAM)
+print ("Number of OFDM carriers in frequency domain: ", len(OFDM_data))
+
+OFDM_time = IDFT(OFDM_data)
+print ("Number of OFDM samples in time-domain before CP: ", len(OFDM_time))
+
+OFDM_withCP = addCP(OFDM_time)
+print ("Number of OFDM samples in time domain with CP: ", len(OFDM_withCP))
+
+OFDM_TX = OFDM_withCP
+OFDM_RX = channel(OFDM_TX)
+
+
+
+OFDM_RX_noCP = removeCP(OFDM_RX)
+print(OFDM_RX_noCP)
+
+OFDM_demod = DFT(OFDM_RX_noCP)
+
+Hest = channelEstimate(OFDM_demod)
+
+equalized_Hest = equalize(OFDM_demod, Hest)
+
+QAM_est = get_payload(equalized_Hest)
+
 PS_est, hardDecision = Demapping(QAM_est)
+bits_est = PS(PS_est)
+plt.figure()
+plt.plot(abs(OFDM_TX), label='TX signal')
+plt.plot(abs(OFDM_RX), label='RX signal')
+plt.legend(fontsize=10)
+plt.xlabel('Time'); plt.ylabel('$|x(t)|$');
+plt.grid(True);
+#plt.show()
+plt.figure()
+plt.plot(QAM_est.real, QAM_est.imag, 'bo');
+
+
 plt.figure()
 for qam, hard in zip(QAM_est, hardDecision):
     plt.plot([qam.real, hard.real], [qam.imag, hard.imag], 'b-o');
     plt.plot(hardDecision.real, hardDecision.imag, 'ro')
 
-def PS(bits):
-    return bits.reshape((-1,))
-bits_est = PS(PS_est)
 
 print ("Obtained Bit error rate: ", np.sum(abs(bits-bits_est))/len(bits))
 plt.show()
