@@ -162,7 +162,6 @@ OFDM_TX = OFDM_withCP
 OFDM_RX = channel(OFDM_TX)
 
 
-
 OFDM_RX_noCP = removeCP(OFDM_RX)
 OFDM_demod = RealizeDFT(OFDM_RX_noCP)
 plt.figure();
