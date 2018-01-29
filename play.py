@@ -1,33 +1,11 @@
-"""PyAudio Example: Play a WAVE file."""
 
-import pyaudio
-import wave
-import sys
-import struct
+import sounddevice as sd
+import soundfile as sf
 
-
-CHUNK = 1024
-
-wf = wave.open("output.wav", 'rb')
-
-p = pyaudio.PyAudio()                            
-stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-                channels=wf.getnchannels(),
-                rate=wf.getframerate(),
-                output=True)
-
-data = wf.readframes(CHUNK)
-print(len(data))
-for i in range(int(len(data)/4)):
-    value = struct.unpack('f', data[i*4:i*4+4])
-    print(value)
-while data != b'':
-    #stream.write(data)
-    data = wf.readframes(CHUNK)
-    print(len(data))
-
-
-stream.stop_stream()
-stream.close()
-
-p.terminate()
+import time
+data, fs = sf.read("wavoutput16b.wav",dtype='int16')
+status = sd.wait()
+print(status)
+for n in range(100):
+    sd.play(data, fs, device=3)
+    time.sleep(0.5)
