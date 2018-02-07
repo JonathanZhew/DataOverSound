@@ -134,20 +134,20 @@ ofdm_dat =[0.50438429, -0.02383506,  0.58791467,  0.2348634 ,  0.13485915,
 
 plt.plot(ofdm_dat)
 
-"""
+
 y = ofdm_dat
 x = np.arange(len(y))
 f = interpolate.interp1d(x, y)
 f2 = interpolate.interp1d(x, y, kind='cubic')
-sampleRate = 1/4
+sampleRate = 1
 xnew = np.arange(0, len(y)-1, sampleRate)
-ynew = f2(xnew)   # use interpolation function returned by `interp1d`
-"""
+ynew = f(xnew)   # use interpolation function returned by `interp1d`
+
 frames = []
 for i in range(len(ofdm_dat)):
     data = bytearray(struct.pack("f", ofdm_dat[i]))
     frames.append(data)
-"""
+
 #sampling
 K = len(ynew)
 P = int(K*sampleRate)
@@ -159,7 +159,7 @@ xsam = np.arange(len(ysam))
 plt.plot(x, y, 'o', xnew, ynew, '-x', xsam, ysam, 'rd')
 plt.legend(['data', 'linear'], loc='best')
 plt.show()
-"""
+
 print(len(frames))        
 wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
 wf.setnchannels(CHANNELS)
@@ -168,7 +168,7 @@ wf.setframerate(RATE)
 wf.writeframes(b''.join(frames))
 wf.close()
 
-int16_dat = np.array(ofdm_dat)*32767
+int16_dat = np.array(ynew)*32767
 int16_dat = int16_dat.astype(np.int16)
 wav.write("wavoutput16b.wav",RATE, int16_dat)
 
