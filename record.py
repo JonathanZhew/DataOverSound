@@ -11,4 +11,4 @@ sd.default.channels = 1
 myrecording = sd.rec(int(duration * fs),dtype='int16')
 sd.wait()
 
-sf.write("record16bnoise.wav", myrecording, fs)
+sf.write("record16b.wav", myrecording, fs)
