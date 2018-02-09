@@ -1,5 +1,7 @@
 import numpy as np
-import scipy.interpolate
+import scipy
+from scipy import interpolate
+from scipy.interpolate import interp1d
 
 #configure paremeter
 K = 64 # number of OFDM subcarriers
@@ -111,7 +113,7 @@ def channelEstimate(OFDM_demod):
     Hest_abs = scipy.interpolate.interp1d(pilotCarriers, abs(Hest_at_pilots), kind='linear')(allCarriers)
     Hest_phase = scipy.interpolate.interp1d(pilotCarriers, np.angle(Hest_at_pilots), kind='linear')(allCarriers)
     Hest = Hest_abs * np.exp(1j*Hest_phase)
-    return Hest
+    return Hest, Hest_at_pilots
 
 def equalize(OFDM_demod, Hest):
     return OFDM_demod / Hest
@@ -138,3 +140,23 @@ def Demapping(QAM):
 
 def PS(bits):
     return bits.reshape((-1,))
+
+#Over Sample
+def OverSample(data, rate = 1/2):
+    #y = data
+    y = np.hstack([data, np.array([0])])
+    x = np.arange(len(y))
+    f = interpolate.interp1d(x, y)
+    f2 = interpolate.interp1d(x, y, kind='cubic')
+    xOverSample = np.arange(0, len(y)-1, rate)
+    yOverSample = f(xOverSample)   # use interpolation function returned by `interp1d`   
+    return yOverSample
+
+def Sample(data, rate = 1/2):
+    K = len(data)
+    P = int(K*rate)
+    allIndexs= np.arange(K) 
+    sampleIndexs= allIndexs[::K//P] 
+    ySample = data[sampleIndexs]
+    xSample = np.arange(len(ySample))
+    return ySample

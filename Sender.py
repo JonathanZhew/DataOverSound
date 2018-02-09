@@ -1,9 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from OFDM import *
+from LibOFDM import *
+import soundfile as sf
+import sounddevice as sd
+import time
+
+fs = 44100
 
 #input data
-info = 'Hello! My name is Jonatan.1234561423534647576867857575756767'
+info = 'Hello! My nam is Jonatan.1234561423534647576867857575756767'
 a = np.fromstring(info, dtype='uint8')  #print ("".join([chr(item) for item in b]))
 b = np.unpackbits(a)                    #b = np.packbits(bits)
 #bits = np.random.binomial(n=1, p=0.5, size=(payloadBits_per_OFDM, ))
@@ -12,47 +17,34 @@ print ("Bits count: ", len(bits))
 print ("First 20 bits: ", bits[:20])
 print ("Mean of bits (should be around 0.5): ", np.mean(bits))
 
-bits = np.random.binomial(n=1, p=0.5, size=(payloadBits_per_OFDM, ))
+np.save('send_bits', bits)
+#bits = np.random.binomial(n=1, p=0.5, size=(payloadBits_per_OFDM, ))
 bits_SP = SP(bits)
 QAM = Mapping(bits_SP)
 OFDM_data = OFDM_symbol(QAM)
 
 OFDM_time = RealizeIDFT(OFDM_data)
 OFDM_withCP = addCP(OFDM_time)
-OFDM_TX = OFDM_withCP
+OFDM_TX = OverSample(OFDM_withCP)
 
+#float to int16
+OFDM_TX_int16 = (np.array(OFDM_TX)*0x3FFF).astype(np.int16)
 
-OFDM_RX2 = OFDM_RX[3:]
-OFDM_RX_noCP = removeCP(OFDM_RX2)
-OFDM_demod = RealizeDFT(OFDM_RX_noCP)
-plt.figure();
-Hest = channelEstimate(OFDM_demod)
-#plt.savefig("channelEstimate.png")
-equalized_Hest = equalize(OFDM_demod, Hest)
-QAM_est = get_payload(equalized_Hest)
-PS_est, hardDecision = Demapping(QAM_est)
-bits_est = PS(PS_est)
+#padding zero
+pads = np.zeros(10,dtype=np.int16)
+OFDM_TX_int16_pad = np.hstack([pads,OFDM_TX_int16,pads])
+#Save file
+sf.write("SenderInt16.wav", OFDM_TX_int16_pad, fs)
+print ("SenderInt16.wav Save done!")
 
-plt.figure(figsize=(8,2))
-plt.plot(abs(OFDM_TX), label='TX signal')
-plt.plot(abs(OFDM_RX), label='RX signal')
-plt.legend(fontsize=10)
-plt.xlabel('Time'); plt.ylabel('$|x(t)|$');
-plt.grid(True);
-#plt.savefig("Time-domainSignals.png")
+#play sound
+print("play file len", len(OFDM_TX_int16_pad))
+sd.play(OFDM_TX_int16_pad, fs, device=3)
+print("play...")
+status = sd.wait()
 
-plt.figure()
-plt.plot(QAM_est.real, QAM_est.imag, 'bo');
-plt.grid(True); plt.xlabel('Real part'); plt.ylabel('Imaginary Part'); plt.title("Received constellation"); 
-#plt.savefig("Constellation.png")
-
-plt.figure()
-for qam, hard in zip(QAM_est, hardDecision):
-    plt.plot([qam.real, hard.real], [qam.imag, hard.imag], 'b-o');
-    plt.plot(hardDecision.real, hardDecision.imag, 'ro')
-plt.grid(True); plt.xlabel('Real part'); plt.ylabel('Imaginary part'); plt.title('Hard Decision demapping');
-#plt.savefig("HardDecision.png")
-
-print ("Obtained Bit error rate: ", np.sum(abs(bits-bits_est))/len(bits))
-
-plt.show()
+for n in range(20):
+    sd.play(OFDM_TX_int16_pad,fs, device=3)
+    time.sleep(0.3)
+    print("play..."+str(n))
+print("The end!")
