@@ -12,13 +12,13 @@ def FindCp(data):
         corr_data.append(float(corr[0,1]))
     arraryCorr = np.array(corr_data)    
     index = np.argmax(arraryCorr)
+    print(arraryCorr[index])
     if(arraryCorr[index]<0.85):
         return -1
     else:
         return index
-"""
 
-data, fs = sf.read("Recipient.wav", dtype='int16')
+data, fs = sf.read("SenderInt16.wav", dtype='int16')
 """
 fs=44100
 duration = 1  # seconds
@@ -31,29 +31,16 @@ print("Recording end!")
 data = np.hstack(recording)
 sf.write("Recipient.wav", data, fs)
 print("save Recording.wav")
-
+"""
 #Find head of OFDM Frame    
 index = FindCp(data)
 print("Frame start at "+ str(index))
 if(index == -1):
     print("I can NOT find any singal")
     sys.exit()
-OFDM_RX_Int16 = -data[index:290+index]
+OFDM_RX_Int16 = data[index:290+index]
 
-#sampling
-OFDM_RX_Sampled = Sample(OFDM_RX_Int16)
-
-#int16 to float
-OFDM_RX = np.array(OFDM_RX_Sampled)/0x3FFF
-
-OFDM_RX_noCP = removeCP(OFDM_RX)
-OFDM_demod = RealizeDFT(OFDM_RX_noCP)
-Hest, Hest_at_pilots = channelEstimate(OFDM_demod)
-#plt.savefig("channelEstimate.png")
-equalized_Hest = equalize(OFDM_demod, Hest)
-QAM_est = get_payload(equalized_Hest)
-PS_est, hardDecision = Demapping(QAM_est)
-bits_est = PS(PS_est)
+bits_est = ofdm_decode(OFDM_RX_Int16)
 
 bit_dat = np.packbits(bits_est)
 print ("".join([chr(item) for item in bit_dat]))
@@ -66,6 +53,7 @@ bits_delta = bits_org-bits_est
 print ("Obtained Bit error rate: ", np.sum(abs(bits_delta))/len(bits_org))
 plt.plot(bits_delta, label='err')
 
+"""
 plt.figure()
 for qam, hard in zip(QAM_est, hardDecision):
     plt.plot([qam.real, hard.real], [qam.imag, hard.imag], 'b-o');
@@ -85,7 +73,7 @@ plt.ylabel('$|H(f)|$');
 plt.legend(fontsize=10)
 
 plt.show()
-"""
+
 plt.figure(figsize=(8,2))
 plt.plot(abs(OFDM_TX), label='TX signal')
 plt.plot(abs(OFDM_RX), label='RX signal')

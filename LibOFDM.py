@@ -21,10 +21,6 @@ P = P+1
 # data carriers are all remaining carriers
 dataCarriers = np.delete(allCarriers, pilotCarriers)
 
-print ("allCarriers:   %s" % allCarriers)
-print ("pilotCarriers: %s" % pilotCarriers)
-print ("dataCarriers:  %s" % dataCarriers)
-
 mu = 4 # bits per symbol (i.e. 16QAM)
 payloadBits_per_OFDM = len(dataCarriers)*mu  # number of payload bits per OFDM symbol
 
@@ -160,3 +156,46 @@ def Sample(data, rate = 1/2):
     ySample = data[sampleIndexs]
     xSample = np.arange(len(ySample))
     return ySample
+
+# bits shoud be length of payloadBits_per_OFDM
+def ofdm_encode(bits):
+    #bits = np.random.binomial(n=1, p=0.5, size=(payloadBits_per_OFDM, ))
+    bitsLen = len(bits)
+    if(bitsLen >= payloadBits_per_OFDM):
+        fullBits = bits[:payloadBits_per_OFDM]
+    else:
+        bPadding = np.random.binomial(n=1, p=0.5, size=(payloadBits_per_OFDM - bitsLen, ))
+        fullBits = np.hstack([bits, bPadding])
+        
+    bits_SP = SP(fullBits)
+    QAM = Mapping(bits_SP)
+    OFDM_data = OFDM_symbol(QAM)
+
+    OFDM_time = RealizeIDFT(OFDM_data)
+    OFDM_withCP = addCP(OFDM_time)
+    OFDM_TX = OverSample(OFDM_withCP)
+
+    #float to int16
+    symbol = (np.array(OFDM_TX)*0x3FFF).astype(np.int16)
+
+    return symbol
+
+def ofdm_decode(symbol):
+    #sampling
+    OFDM_RX_Sampled = Sample(symbol)
+
+    #int16 to float
+    #OFDM_RX = np.array(OFDM_RX_Sampled)/0x3FFF
+    OFDM_RX= OFDM_RX_Sampled
+
+    OFDM_RX_noCP = removeCP(OFDM_RX)
+    OFDM_demod = RealizeDFT(OFDM_RX_noCP)
+    Hest, Hest_at_pilots = channelEstimate(OFDM_demod)
+    #plt.savefig("channelEstimate.png")
+    equalized_Hest = equalize(OFDM_demod, Hest)
+    QAM_est = get_payload(equalized_Hest)
+    PS_est, hardDecision = Demapping(QAM_est)
+    bits_est = PS(PS_est)
+
+    return bits_est
+
